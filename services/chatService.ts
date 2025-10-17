@@ -103,12 +103,20 @@ export const subscribeToMessages = (groupId: string, callback: (messages: Messag
     const q = query(messagesCol, orderBy('timestamp', 'asc'));
 
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
-        const messages: Message[] = [];
-        querySnapshot.forEach((doc) => {
+        const messages: Message[] = querySnapshot.docs.map(doc => {
             const data = doc.data();
-            // Convert Firestore Timestamp to number for consistent typing
+            // Convert Firestore Timestamp to number for consistent typing and to avoid circular structures.
             const timestamp = (data.timestamp as Timestamp)?.toMillis() || Date.now();
-            messages.push({ id: doc.id, ...data, timestamp } as Message);
+            // Explicitly construct the message object to ensure no complex Firestore objects are leaked into the state.
+            return {
+                id: doc.id,
+                groupId: data.groupId,
+                sender: data.sender,
+                text: data.text,
+                file: data.file,
+                timestamp: timestamp,
+                readBy: data.readBy,
+            } as Message;
         });
         callback(messages);
     });
