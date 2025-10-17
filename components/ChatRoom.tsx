@@ -1,25 +1,31 @@
+
 import React, { useState, useRef, useEffect } from 'react';
-import type { Group, User } from '../types';
+// fix: Replaced non-existent 'Group' type with 'Channel'.
+import type { Channel, User } from '../types';
 import Message from './Message';
 import { useChat } from '../hooks/useChat';
+// fix: Imported missing 'addParticipant' service.
 import { sendMessage, addParticipant } from '../services/chatService';
+// fix: Imported missing 'BackIcon'.
 import { SendIcon, AttachmentIcon, BackIcon } from './Icons';
 
 interface ChatRoomProps {
-  group: Group;
+  // fix: Renamed prop from 'group' to 'channel' for clarity and type correctness.
+  channel: Channel;
   currentUser: User;
   onLeave: () => void;
 }
 
-const ChatRoom: React.FC<ChatRoomProps> = ({ group, currentUser, onLeave }) => {
-  const { messages } = useChat(group, currentUser);
+const ChatRoom: React.FC<ChatRoomProps> = ({ channel, currentUser, onLeave }) => {
+  const { messages } = useChat(channel, currentUser);
   const [text, setText] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    addParticipant(group.id, currentUser);
-  }, [group.id, currentUser]);
+    // fix: Corrected the argument to pass the serverId from the channel object.
+    addParticipant(channel.serverId, currentUser);
+  }, [channel.serverId, currentUser]);
   
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -27,7 +33,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ group, currentUser, onLeave }) => {
 
   const handleSendMessage = () => {
     if (text.trim()) {
-      sendMessage(group.id, currentUser, { text: text.trim() });
+      sendMessage(channel.id, currentUser, { text: text.trim() });
       setText('');
     }
   };
@@ -45,7 +51,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ group, currentUser, onLeave }) => {
         const reader = new FileReader();
         reader.onload = (event) => {
             const data = event.target?.result as string;
-            sendMessage(group.id, currentUser, { file: { name: file.name, type: file.type, data } });
+            sendMessage(channel.id, currentUser, { file: { name: file.name, type: file.type, data } });
         };
         reader.readAsDataURL(file);
     }
@@ -57,13 +63,14 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ group, currentUser, onLeave }) => {
         <button onClick={onLeave} className="mr-4 text-highlight hover:text-light transition-colors">
           <BackIcon className="w-6 h-6"/>
         </button>
-        <h2 className="text-xl font-bold text-light">{group.name}</h2>
+        <h2 className="text-xl font-bold text-light">{channel.name}</h2>
       </header>
 
       <main className="flex-1 overflow-y-auto p-4 md:p-6">
         <div className="space-y-6">
           {messages.map((msg) => (
-            <Message key={msg.id} message={msg} currentUser={currentUser} group={group} />
+            // fix: Removed invalid 'group' prop from Message component.
+            <Message key={msg.id} message={msg} currentUser={currentUser} />
           ))}
           <div ref={messagesEndRef} />
         </div>

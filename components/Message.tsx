@@ -1,23 +1,16 @@
 
 import React from 'react';
-import type { Message as MessageType, User, Group } from '../types';
-import { DoubleCheckIcon, FileIcon } from './Icons';
+import type { Message as MessageType, User } from '../types';
+import { FileIcon } from './Icons';
 
 interface MessageProps {
   message: MessageType;
   currentUser: User;
-  group: Group;
 }
 
-const Message: React.FC<MessageProps> = ({ message, currentUser, group }) => {
+const Message: React.FC<MessageProps> = ({ message, currentUser }) => {
   const isSender = message.sender.id === currentUser.id;
   const time = new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-  const otherParticipantsCount = group.participants.filter(p => p.id !== currentUser.id).length;
-  // A message is fully "read" if all OTHER known participants have read it.
-  const isReadByAll = otherParticipantsCount > 0 && group.participants
-    .filter(p => p.id !== currentUser.id)
-    .every(p => message.readBy.includes(p.id));
 
   const renderFile = () => {
     if (!message.file) return null;
@@ -39,18 +32,18 @@ const Message: React.FC<MessageProps> = ({ message, currentUser, group }) => {
   }
 
   return (
-    <div className={`flex ${isSender ? 'justify-end' : 'justify-start'}`}>
-      <div className={`flex flex-col ${isSender ? 'items-end' : 'items-start'} max-w-md md:max-w-lg`}>
-        <div className={`px-4 py-3 rounded-2xl ${isSender ? 'bg-highlight text-primary rounded-br-md' : 'bg-secondary text-light rounded-bl-md'}`}>
-          {!isSender && <p className="font-bold text-cyan-300 text-sm mb-1">{message.sender.name}</p>}
+    <div className={`flex items-start gap-3 ${isSender ? 'flex-row-reverse' : ''} group`}>
+      <div className={`w-10 h-10 rounded-full bg-highlight flex-shrink-0 flex items-center justify-center font-bold text-primary`}>
+          {message.sender.name.charAt(0).toUpperCase()}
+      </div>
+      <div className={`flex flex-col ${isSender ? 'items-end' : 'items-start'}`}>
+        <div className="flex items-baseline gap-3">
+          {!isSender && <p className="font-bold text-sm">{message.sender.name}</p>}
+          <span className="text-xs text-accent">{time}</span>
+        </div>
+        <div className={`px-4 py-2 rounded-lg mt-1 ${isSender ? 'bg-highlight text-primary' : 'bg-secondary text-light'}`}>
           {message.text && <p className="whitespace-pre-wrap break-words">{message.text}</p>}
           {message.file && renderFile()}
-        </div>
-        <div className="flex items-center gap-1.5 mt-1 px-1">
-          <span className="text-xs text-accent">{time}</span>
-          {isSender && (
-            <DoubleCheckIcon className="w-4 h-4" colorClass={isReadByAll ? 'text-blue-400' : 'text-accent'} />
-          )}
         </div>
       </div>
     </div>

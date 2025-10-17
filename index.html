@@ -1,21 +1,24 @@
+
 <!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Gemini Real-time Chat</title>
+    <title>Gemini Discord Clone</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
       tailwind.config = {
         theme: {
           extend: {
             colors: {
-              'primary': '#0D1B2A',
-              'secondary': '#1B263B',
-              'accent': '#415A77',
-              'highlight': '#778DA9',
-              'light': '#E0E1DD',
+              'primary': '#23272A',
+              'secondary': '#2C2F33',
+              'accent': '#99AAB5',
+              'highlight': '#7289DA',
+              'light': '#FFFFFF',
+              'dark-not-black': '#2C2F33',
+              'status-green': '#43B581',
             },
           }
         }
@@ -29,6 +32,7 @@
     "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
     "firebase/app": "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js",
     "firebase/database": "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js",
+    "firebase/auth": "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js",
     "firebase/": "https://aistudiocdn.com/firebase@^12.4.0/"
   }
 }

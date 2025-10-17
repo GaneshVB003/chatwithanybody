@@ -1,10 +1,14 @@
+
 import React, { useState, useEffect } from 'react';
-import type { Group } from '../types';
+// fix: Replaced non-existent 'Group' with 'Server' type.
+import type { Server } from '../types';
+// fix: Imported missing service functions.
 import { getGroups, createGroup, verifyGroupPassword } from '../services/chatService';
+// fix: Imported missing SearchIcon.
 import { SearchIcon, CloseIcon } from './Icons';
 
 interface HomePageProps {
-  onJoinGroup: (group: Group, nickname: string) => void;
+  onJoinGroup: (group: Server, nickname: string) => void;
 }
 
 const CreateGroupModal: React.FC<{ onClose: () => void; onCreate: (name: string, password?: string) => Promise<void>; }> = ({ onClose, onCreate }) => {
@@ -49,7 +53,7 @@ const CreateGroupModal: React.FC<{ onClose: () => void; onCreate: (name: string,
 };
 
 
-const JoinGroupModal: React.FC<{ group: Group; onClose: () => void; onJoin: (group: Group, nickname: string) => void; }> = ({ group, onClose, onJoin }) => {
+const JoinGroupModal: React.FC<{ group: Server; onClose: () => void; onJoin: (group: Server, nickname: string) => void; }> = ({ group, onClose, onJoin }) => {
     const [nickname, setNickname] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
@@ -97,10 +101,10 @@ const JoinGroupModal: React.FC<{ group: Group; onClose: () => void; onJoin: (gro
 }
 
 const HomePage: React.FC<HomePageProps> = ({ onJoinGroup }) => {
-  const [groups, setGroups] = useState<Group[]>([]);
+  const [groups, setGroups] = useState<Server[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [isCreating, setIsCreating] = useState(false);
-  const [joiningGroup, setJoiningGroup] = useState<Group | null>(null);
+  const [joiningGroup, setJoiningGroup] = useState<Server | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {

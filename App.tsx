@@ -1,60 +1,43 @@
 
 import React, { useState, useEffect } from 'react';
-import HomePage from './components/HomePage';
-import ChatRoom from './components/ChatRoom';
-import { getCurrentUser, createOrGetUser } from './services/chatService';
-import type { User, Group } from './types';
+import { onAuth } from './services/chatService';
+import type { User } from './types';
+import AuthModal from './components/AuthModal';
+import MainLayout from './components/MainLayout';
 
 const App: React.FC = () => {
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [currentGroup, setCurrentGroup] = useState<Group | null>(null);
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const user = createOrGetUser();
-    setCurrentUser(user);
+    const unsubscribe = onAuth((firebaseUser) => {
+      if (firebaseUser) {
+        setUser({
+            id: firebaseUser.uid,
+            name: firebaseUser.displayName || 'User',
+            email: firebaseUser.email || '',
+            online: true,
+        });
+      } else {
+        setUser(null);
+      }
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
   }, []);
 
-  const handleJoinGroup = (group: Group, nickname: string) => {
-    if (currentUser) {
-      const userWithNickname = { ...currentUser, name: nickname };
-      setCurrentUser(userWithNickname);
-      localStorage.setItem('chat_user', JSON.stringify(userWithNickname));
-      
-      // Defensively re-sanitize the group object before setting it in the top-level state.
-      // This ensures no complex Firestore objects can ever make it into the app's state.
-      const sanitizedGroup: Group = {
-        id: group.id,
-        name: group.name,
-        hasPassword: group.hasPassword,
-        participants: group.participants.map(p => ({ id: p.id, name: p.name })),
-      };
-      setCurrentGroup(sanitizedGroup);
-    }
-  };
-
-  const handleLeaveGroup = () => {
-    setCurrentGroup(null);
-  };
-
-  if (!currentUser) {
+  if (loading) {
     return (
       <div className="flex items-center justify-center h-screen bg-primary">
-        <div className="text-xl text-light">Initializing...</div>
+        <div className="text-xl text-light">Loading...</div>
       </div>
     );
   }
 
   return (
-    <div className="h-screen w-screen bg-primary font-sans">
-      {currentGroup ? (
-        <ChatRoom
-          group={currentGroup}
-          currentUser={currentUser}
-          onLeave={handleLeaveGroup}
-        />
-      ) : (
-        <HomePage onJoinGroup={handleJoinGroup} />
-      )}
+    <div className="h-screen w-screen bg-primary font-sans text-light">
+      {user ? <MainLayout user={user} /> : <AuthModal />}
     </div>
   );
 };

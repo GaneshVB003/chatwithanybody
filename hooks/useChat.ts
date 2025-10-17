@@ -1,15 +1,18 @@
+
 import { useState, useEffect, useCallback, useRef } from 'react';
-import type { Message, Group, User } from '../types';
+// fix: Replaced non-existent 'Group' type with 'Channel' as the hook operates on channels.
+import type { Message, Channel, User } from '../types';
 import { subscribeToMessages, markMessageAsRead } from '../services/chatService';
 
-export const useChat = (group: Group, currentUser: User) => {
+export const useChat = (group: Channel, currentUser: User) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const isVisibleRef = useRef(document.visibilityState === 'visible');
 
   const markUnreadMessages = useCallback((msgs: Message[]) => {
       if (isVisibleRef.current) {
           msgs.forEach(msg => {
-              if (!msg.readBy.includes(currentUser.id)) {
+              // fix: Changed from 'includes' to object property access, as readBy is an object.
+              if (!msg.readBy[currentUser.id]) {
                   markMessageAsRead(group.id, msg.id, currentUser.id);
               }
           });
