@@ -1,12 +1,26 @@
-
+import { db } from './firebase';
+import { 
+    collection, 
+    addDoc, 
+    getDocs, 
+    query, 
+    where, 
+    doc, 
+    getDoc, 
+    setDoc,
+    updateDoc, 
+    arrayUnion,
+    onSnapshot,
+    orderBy,
+    serverTimestamp,
+    Timestamp,
+    Unsubscribe
+} from 'firebase/firestore';
 import type { User, Group, Message } from '../types';
 
-const USERS_KEY = 'chat_users';
-const GROUPS_KEY = 'chat_groups';
-const MESSAGES_KEY_PREFIX = 'chat_messages_';
 const CURRENT_USER_KEY = 'chat_user';
 
-// --- User Management ---
+// --- User Management (remains local) ---
 const generateId = (): string => new Date().getTime().toString(36) + Math.random().toString(36).substr(2);
 
 export const createOrGetUser = (): User => {
@@ -28,88 +42,95 @@ export const getCurrentUser = (): User | null => {
 }
 
 // --- Group Management ---
-export const getGroups = (): Group[] => {
-  const storedGroups = localStorage.getItem(GROUPS_KEY);
-  return storedGroups ? JSON.parse(storedGroups) : [];
+export const getGroups = async (): Promise<Group[]> => {
+  const groupsCol = collection(db, 'groups');
+  const groupSnapshot = await getDocs(groupsCol);
+  const groupList = groupSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Group));
+  return groupList;
 };
 
-export const createGroup = (name: string, password?: string): Group => {
-  const groups = getGroups();
-  if (groups.some(g => g.name.toLowerCase() === name.toLowerCase())) {
-    throw new Error('A group with this name already exists.');
+export const createGroup = async (name: string, password?: string): Promise<Group> => {
+  // Check if group with same name exists
+  const groupsRef = collection(db, 'groups');
+  const q = query(groupsRef, where("name", "==", name));
+  const querySnapshot = await getDocs(q);
+  if (!querySnapshot.empty) {
+      throw new Error('A group with this name already exists.');
   }
-  const newGroup: Group = {
-    id: `group_${generateId()}`,
+
+  const newGroupData = {
     name,
     hasPassword: !!password,
     participants: [],
   };
-  
-  const updatedGroups = [...groups, newGroup];
-  localStorage.setItem(GROUPS_KEY, JSON.stringify(updatedGroups));
+
+  const docRef = await addDoc(groupsRef, newGroupData);
   
   if (password) {
-    localStorage.setItem(`group_pwd_${newGroup.id}`, password);
+    await setDoc(doc(db, "group_passwords", docRef.id), { password });
   }
-  
-  return newGroup;
+
+  return { id: docRef.id, ...newGroupData };
 };
 
-export const verifyGroupPassword = (groupId: string, password?: string): boolean => {
-    const storedPassword = localStorage.getItem(`group_pwd_${groupId}`);
-    if (!storedPassword) return true;
-    return storedPassword === password;
+export const verifyGroupPassword = async (groupId: string, password?: string): Promise<boolean> => {
+    const passwordDocRef = doc(db, "group_passwords", groupId);
+    const passwordDoc = await getDoc(passwordDocRef);
+    if (!passwordDoc.exists()) {
+        // Group has no password, so verification passes
+        return true;
+    }
+    return passwordDoc.data().password === password;
 };
 
-export const addParticipant = (groupId: string, user: User) => {
-    const groups = getGroups();
-    const groupIndex = groups.findIndex(g => g.id === groupId);
-    if(groupIndex > -1) {
-        if (!groups[groupIndex].participants.find(p => p.id === user.id)) {
-            groups[groupIndex].participants.push(user);
-            localStorage.setItem(GROUPS_KEY, JSON.stringify(groups));
+export const addParticipant = async (groupId: string, user: User) => {
+    const groupDocRef = doc(db, "groups", groupId);
+    const groupDoc = await getDoc(groupDocRef);
+    if(groupDoc.exists()) {
+        const groupData = groupDoc.data() as Group;
+        const isParticipant = groupData.participants.some(p => p.id === user.id);
+        if(!isParticipant) {
+             await updateDoc(groupDocRef, {
+                participants: arrayUnion(user)
+            });
         }
     }
 };
 
 // --- Message Management ---
-export const getMessages = (groupId: string): Message[] => {
-  const storedMessages = localStorage.getItem(`${MESSAGES_KEY_PREFIX}${groupId}`);
-  return storedMessages ? JSON.parse(storedMessages) : [];
-};
+export const subscribeToMessages = (groupId: string, callback: (messages: Message[]) => void): Unsubscribe => {
+    const messagesCol = collection(db, 'groups', groupId, 'messages');
+    const q = query(messagesCol, orderBy('timestamp', 'asc'));
 
-export const sendMessage = (groupId: string, sender: User, content: { text?: string, file?: { name: string, type: string, data: string } }): Message => {
-  const messages = getMessages(groupId);
-  const newMessage: Message = {
-    id: `msg_${generateId()}`,
-    groupId,
-    sender,
-    timestamp: Date.now(),
-    readBy: [sender.id], // Sender has implicitly read their own message
-    ...content
-  };
-  const updatedMessages = [...messages, newMessage];
-  localStorage.setItem(`${MESSAGES_KEY_PREFIX}${groupId}`, JSON.stringify(updatedMessages));
-  
-  // Simulate storage event for same-tab updates in some scenarios
-  window.dispatchEvent(new Event('storage'));
-
-  return newMessage;
-};
-
-export const markMessagesAsRead = (groupId: string, userId: string): void => {
-    const messages = getMessages(groupId);
-    let updated = false;
-    const updatedMessages = messages.map(msg => {
-        if (!msg.readBy.includes(userId)) {
-            updated = true;
-            return { ...msg, readBy: [...msg.readBy, userId] };
-        }
-        return msg;
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+        const messages: Message[] = [];
+        querySnapshot.forEach((doc) => {
+            const data = doc.data();
+            // Convert Firestore Timestamp to number for consistent typing
+            const timestamp = (data.timestamp as Timestamp)?.toMillis() || Date.now();
+            messages.push({ id: doc.id, ...data, timestamp } as Message);
+        });
+        callback(messages);
     });
-    
-    if (updated) {
-        localStorage.setItem(`${MESSAGES_KEY_PREFIX}${groupId}`, JSON.stringify(updatedMessages));
-        window.dispatchEvent(new Event('storage'));
-    }
+
+    return unsubscribe;
+}
+
+export const sendMessage = async (groupId: string, sender: User, content: { text?: string, file?: { name: string, type: string, data: string } }): Promise<void> => {
+    const messagesCol = collection(db, 'groups', groupId, 'messages');
+    const newMessageData = {
+        groupId,
+        sender,
+        timestamp: serverTimestamp(),
+        readBy: [sender.id],
+        ...content
+    };
+    await addDoc(messagesCol, newMessageData);
+};
+
+export const markMessageAsRead = async (groupId: string, messageId: string, userId: string): Promise<void> => {
+    const messageDocRef = doc(db, 'groups', groupId, 'messages', messageId);
+    await updateDoc(messageDocRef, {
+        readBy: arrayUnion(userId)
+    });
 };

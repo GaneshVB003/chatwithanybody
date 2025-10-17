@@ -1,48 +1,44 @@
-
 import { useState, useEffect, useCallback, useRef } from 'react';
 import type { Message, Group, User } from '../types';
-import { getMessages, markMessagesAsRead } from '../services/chatService';
+import { subscribeToMessages, markMessageAsRead } from '../services/chatService';
 
 export const useChat = (group: Group, currentUser: User) => {
   const [messages, setMessages] = useState<Message[]>([]);
-  const isVisibleRef = useRef(true);
+  const isVisibleRef = useRef(document.visibilityState === 'visible');
 
-  const fetchMessages = useCallback(() => {
-    const newMessages = getMessages(group.id);
-    setMessages(newMessages);
-
-    if (isVisibleRef.current) {
-        markMessagesAsRead(group.id, currentUser.id);
-    }
+  const markUnreadMessages = useCallback((msgs: Message[]) => {
+      if (isVisibleRef.current) {
+          msgs.forEach(msg => {
+              if (!msg.readBy.includes(currentUser.id)) {
+                  markMessageAsRead(group.id, msg.id, currentUser.id);
+              }
+          });
+      }
   }, [group.id, currentUser.id]);
-  
+
   useEffect(() => {
     const handleVisibilityChange = () => {
       isVisibleRef.current = document.visibilityState === 'visible';
       if (isVisibleRef.current) {
-          fetchMessages();
+          // When tab becomes visible again, mark any messages that might have arrived
+          markUnreadMessages(messages);
       }
     };
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [fetchMessages]);
-
+  }, [messages, markUnreadMessages]);
 
   useEffect(() => {
-    fetchMessages();
-
-    // Poll for new messages every 2 seconds to simulate real-time
-    const interval = setInterval(fetchMessages, 2000);
-
-    // Listen for storage events to get updates from other tabs
-    window.addEventListener('storage', fetchMessages);
+    const unsubscribe = subscribeToMessages(group.id, (newMessages) => {
+        setMessages(newMessages);
+        markUnreadMessages(newMessages);
+    });
 
     return () => {
-      clearInterval(interval);
-      window.removeEventListener('storage', fetchMessages);
+        unsubscribe();
     };
-  }, [group.id, fetchMessages]);
+  }, [group.id, markUnreadMessages]);
 
   return { messages };
 };

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import type { Group } from '../types';
 import { getGroups, createGroup, verifyGroupPassword } from '../services/chatService';
@@ -8,21 +7,26 @@ interface HomePageProps {
   onJoinGroup: (group: Group, nickname: string) => void;
 }
 
-const CreateGroupModal: React.FC<{ onClose: () => void; onCreate: (name: string, password?: string) => void; }> = ({ onClose, onCreate }) => {
+const CreateGroupModal: React.FC<{ onClose: () => void; onCreate: (name: string, password?: string) => Promise<void>; }> = ({ onClose, onCreate }) => {
     const [name, setName] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if(!name.trim()) {
             setError('Group name cannot be empty.');
             return;
         }
+        setError('');
+        setIsSubmitting(true);
         try {
-            onCreate(name, password);
+            await onCreate(name, password);
         } catch (err: any) {
             setError(err.message);
+        } finally {
+            setIsSubmitting(false);
         }
     }
     
@@ -35,7 +39,9 @@ const CreateGroupModal: React.FC<{ onClose: () => void; onCreate: (name: string,
                     <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="Group Name" className="w-full bg-primary p-3 rounded mb-4 text-light focus:outline-none focus:ring-2 focus:ring-highlight"/>
                     <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Password (Optional)" className="w-full bg-primary p-3 rounded mb-4 text-light focus:outline-none focus:ring-2 focus:ring-highlight"/>
                     {error && <p className="text-red-400 text-sm mb-4">{error}</p>}
-                    <button type="submit" className="w-full bg-highlight text-primary font-bold py-3 rounded hover:bg-light transition-all">Create</button>
+                    <button type="submit" disabled={isSubmitting} className="w-full bg-highlight text-primary font-bold py-3 rounded hover:bg-light transition-all disabled:bg-accent disabled:cursor-not-allowed">
+                        {isSubmitting ? 'Creating...' : 'Create'}
+                    </button>
                 </form>
             </div>
         </div>
@@ -43,24 +49,32 @@ const CreateGroupModal: React.FC<{ onClose: () => void; onCreate: (name: string,
 };
 
 
-const JoinGroupModal: React.FC<{ group: Group; onClose: () => void; onJoin: (group: Group, nickname: string, password?: string) => void; }> = ({ group, onClose, onJoin }) => {
+const JoinGroupModal: React.FC<{ group: Group; onClose: () => void; onJoin: (group: Group, nickname: string) => void; }> = ({ group, onClose, onJoin }) => {
     const [nickname, setNickname] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
+    const [isVerifying, setIsVerifying] = useState(false);
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!nickname.trim()) {
             setError('Nickname cannot be empty.');
             return;
         }
-        if (group.hasPassword) {
-            if (!verifyGroupPassword(group.id, password)) {
+        setError('');
+        setIsVerifying(true);
+        try {
+            const isCorrect = await verifyGroupPassword(group.id, password);
+            if (!isCorrect) {
                 setError('Incorrect password.');
                 return;
             }
+            onJoin(group, nickname);
+        } catch (err) {
+            setError('Could not join group. Please try again.');
+        } finally {
+            setIsVerifying(false);
         }
-        onJoin(group, nickname, password);
     };
 
     return (
@@ -73,7 +87,9 @@ const JoinGroupModal: React.FC<{ group: Group; onClose: () => void; onJoin: (gro
                     <input type="text" value={nickname} onChange={e => setNickname(e.target.value)} placeholder="Your Nickname" className="w-full bg-primary p-3 rounded mb-4 text-light focus:outline-none focus:ring-2 focus:ring-highlight"/>
                     {group.hasPassword && <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Group Password" className="w-full bg-primary p-3 rounded mb-4 text-light focus:outline-none focus:ring-2 focus:ring-highlight"/>}
                     {error && <p className="text-red-400 text-sm mb-4">{error}</p>}
-                    <button type="submit" className="w-full bg-highlight text-primary font-bold py-3 rounded hover:bg-light transition-all">Join Chat</button>
+                    <button type="submit" disabled={isVerifying} className="w-full bg-highlight text-primary font-bold py-3 rounded hover:bg-light transition-all disabled:bg-accent disabled:cursor-not-allowed">
+                        {isVerifying ? 'Joining...' : 'Join Chat'}
+                    </button>
                 </form>
             </div>
         </div>
@@ -85,13 +101,25 @@ const HomePage: React.FC<HomePageProps> = ({ onJoinGroup }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   const [joiningGroup, setJoiningGroup] = useState<Group | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    setGroups(getGroups());
+    const fetchGroups = async () => {
+        setIsLoading(true);
+        try {
+            const fetchedGroups = await getGroups();
+            setGroups(fetchedGroups);
+        } catch (err) {
+            console.error("Failed to fetch groups:", err);
+        } finally {
+            setIsLoading(false);
+        }
+    }
+    fetchGroups();
   }, []);
 
-  const handleCreateGroup = (name: string, password?: string) => {
-    const newGroup = createGroup(name, password);
+  const handleCreateGroup = async (name: string, password?: string) => {
+    const newGroup = await createGroup(name, password);
     setGroups(prev => [...prev, newGroup]);
     setIsCreating(false);
   };
@@ -127,7 +155,8 @@ const HomePage: React.FC<HomePageProps> = ({ onJoinGroup }) => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredGroups.length > 0 ? filteredGroups.map(group => (
+        {isLoading ? <p className="text-accent md:col-span-3 text-center py-8">Loading groups...</p> 
+        : filteredGroups.length > 0 ? filteredGroups.map(group => (
           <div 
             key={group.id} 
             onClick={() => setJoiningGroup(group)}
