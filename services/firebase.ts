@@ -1,5 +1,5 @@
-import { initializeApp } from "firebase/app";
-import { getFirestore } from "firebase/firestore";
+import firebase from "firebase/compat/app";
+import "firebase/compat/database";
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
@@ -8,9 +8,10 @@ const firebaseConfig = {
   projectId: "studio-4201862341-a37db",
   storageBucket: "studio-4201862341-a37db.appspot.com",
   messagingSenderId: "1032963134049",
-  appId: "1:1032963134049:web:a79f7dbc9c553752ce1020"
+  appId: "1:1032963134049:web:a79f7dbc9c553752ce1020",
+  databaseURL: "https://studio-4201862341-a37db-default-rtdb.firebaseio.com"
 };
 
 // Initialize Firebase
-const app = initializeApp(firebaseConfig);
-export const db = getFirestore(app);
+firebase.initializeApp(firebaseConfig);
+export const db = firebase.database();

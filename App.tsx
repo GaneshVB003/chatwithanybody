@@ -19,7 +19,16 @@ const App: React.FC = () => {
       const userWithNickname = { ...currentUser, name: nickname };
       setCurrentUser(userWithNickname);
       localStorage.setItem('chat_user', JSON.stringify(userWithNickname));
-      setCurrentGroup(group);
+      
+      // Defensively re-sanitize the group object before setting it in the top-level state.
+      // This ensures no complex Firestore objects can ever make it into the app's state.
+      const sanitizedGroup: Group = {
+        id: group.id,
+        name: group.name,
+        hasPassword: group.hasPassword,
+        participants: group.participants.map(p => ({ id: p.id, name: p.name })),
+      };
+      setCurrentGroup(sanitizedGroup);
     }
   };
 
