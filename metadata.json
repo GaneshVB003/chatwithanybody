@@ -1,0 +1,5 @@
+{
+  "name": "Gemini Real-time Chat",
+  "description": "A real-time chat application that allows users to join password-protected group chats, share files, and see message read receipts without requiring a login. All data is stored locally in the browser to simulate a real-time database.",
+  "requestFramePermissions": []
+}
